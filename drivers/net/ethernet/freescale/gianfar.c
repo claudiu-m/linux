@@ -2506,7 +2506,7 @@ static int gfar_clean_rx_ring(struct gfar_priv_rx_q *rx_queue,
 	struct rxbd8 *bdp;
 	int i, howmany = 0;
 	struct sk_buff *skb = rx_queue->skb;
-	int cleaned_cnt = gfar_rxbd_unused(rx_queue);
+	int unused_cnt = gfar_rxbd_unused(rx_queue);
 	unsigned int total_bytes = 0, total_pkts = 0;
 
 	/* Get the first full descriptor */
@@ -2515,9 +2515,12 @@ static int gfar_clean_rx_ring(struct gfar_priv_rx_q *rx_queue,
 	while (rx_work_limit--) {
 		u32 lstatus;
 
-		if (cleaned_cnt >= GFAR_RX_BUFF_ALLOC) {
-			gfar_alloc_rx_buffs(rx_queue, cleaned_cnt);
-			cleaned_cnt = 0;
+		if (unused_cnt >= GFAR_RX_BUFF_ALLOC) {
+			struct gfar __iomem *regs = rx_queue->grp->regs;
+			gfar_alloc_rx_buffs(rx_queue, unused_cnt);
+			/* Clear the halt bit in RSTAT */
+			gfar_write(&regs->rstat, rx_queue->grp->rstat);
+			unused_cnt = 0;
 		}
 
 		bdp = &rx_queue->rx_bd_base[i];
@@ -2544,7 +2547,7 @@ static int gfar_clean_rx_ring(struct gfar_priv_rx_q *rx_queue,
 		if (unlikely(!skb))
 			break;
 
-		cleaned_cnt++;
+		unused_cnt++;
 		howmany++;
 
 		if (unlikely(++i == rx_queue->rx_ring_size))
@@ -2588,9 +2591,6 @@ static int gfar_clean_rx_ring(struct gfar_priv_rx_q *rx_queue,
 	rx_queue->stats.rx_packets += total_pkts;
 	rx_queue->stats.rx_bytes += total_bytes;
 
-	if (cleaned_cnt)
-		gfar_alloc_rx_buffs(rx_queue, cleaned_cnt);
-
 	/* Update Last Free RxBD pointer for LFC */
 	if (unlikely(priv->tx_actual_en)) {
 		u32 bdp_dma = gfar_rxbd_dma_lastfree(rx_queue);
@@ -2619,8 +2619,6 @@ static int gfar_poll_rx_sq(struct napi_struct *napi, int budget)
 	if (work_done < budget) {
 		u32 imask;
 		napi_complete_done(napi, work_done);
-		/* Clear the halt bit in RSTAT */
-		gfar_write(&regs->rstat, gfargrp->rstat);
 
 		spin_lock_irq(&gfargrp->grplock);
 		imask = gfar_read(&regs->imask);
