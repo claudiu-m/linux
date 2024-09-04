@@ -2145,7 +2145,7 @@ static int gfar_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 /* Interrupt Handler for Transmit complete */
-static void gfar_clean_tx_ring(struct gfar_priv_tx_q *tx_queue)
+static void gfar_clean_tx_ring(struct gfar_priv_tx_q *tx_queue, int napi_budget)
 {
 	struct net_device *dev = tx_queue->dev;
 	struct netdev_queue *txq;
@@ -2229,7 +2229,7 @@ static void gfar_clean_tx_ring(struct gfar_priv_tx_q *tx_queue)
 
 		bytes_sent += GFAR_CB(skb)->bytes_sent;
 
-		dev_kfree_skb_any(skb);
+		napi_consume_skb(skb, napi_budget);
 
 		tx_queue->tx_skbuff[skb_dirtytx] = NULL;
 
@@ -2645,7 +2645,7 @@ static int gfar_poll_tx_sq(struct napi_struct *napi, int budget)
 
 	/* run Tx cleanup to completion */
 	if (tx_queue->tx_skbuff[tx_queue->skb_dirtytx])
-		gfar_clean_tx_ring(tx_queue);
+		gfar_clean_tx_ring(tx_queue, budget);
 
 	napi_complete(napi);
 
