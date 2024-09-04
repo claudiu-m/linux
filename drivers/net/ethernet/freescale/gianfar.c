@@ -2411,7 +2411,7 @@ static struct sk_buff *gfar_get_next_rxbuff(struct gfar_priv_rx_q *rx_queue,
 	if (likely(!skb)) {
 		void *buff_addr = page_address(page) + rxb->page_offset;
 
-		skb = build_skb(buff_addr, GFAR_SKBFRAG_SIZE);
+		skb = napi_build_skb(buff_addr, GFAR_SKBFRAG_SIZE);
 		if (unlikely(!skb)) {
 			gfar_rx_alloc_err(rx_queue);
 			return NULL;
